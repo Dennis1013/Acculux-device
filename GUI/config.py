@@ -1,0 +1,19 @@
+import numpy as np
+
+GRAVITY = np.array([0.0, 0.0, 9.81])
+
+ACCEL_NOISE = ...
+
+GYRO_NOISE = ...
+
+ACCEL_BIAS_NOISE = ...
+
+GYRO_BIAS_NOISE = ...
+
+IMU_OFFSET_TOP = ...
+
+IMU_OFFSET_BOTTOM = ...
+
+SAMPLE_RATE = 200
+
+SCAN_TIME = 5.0
