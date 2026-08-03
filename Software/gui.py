@@ -2,8 +2,12 @@ import sys
 import numpy as np
 import pyqtgraph.opengl as gl
 from PyQt6.QtCore import QSize, Qt, QTimer
-from PyQt6.QtWidgets import QApplication, QGridLayout, QHBoxLayout, QMainWindow, QPushButton, QWidget, QVBoxLayout, QGroupBox, QFormLayout, QLabel, QMessageBox
+from PyQt6.QtWidgets import QApplication, QGridLayout, QHBoxLayout, QMainWindow, QPushButton, QWidget, QVBoxLayout, QGroupBox, QFormLayout, QLabel, QMessageBox, QCheckBox
 from PyQt6.QtGui import QFont
+import csv
+
+import breast
+import config
 
 font = QFont()
 font.setPointSize(12)
@@ -18,6 +22,7 @@ class MainWindow(QMainWindow):
         self.latest_angles = np.zeros(3)
         self.latest_force = 0.0
         self.current_popup = None
+        self.scan_data = [] # For recording data
 
         self.scanning = False
         self.reset_request = False
@@ -38,12 +43,16 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.plot3D, stretch=50)
 
         self.bottom = bottomWindow()
+
         self.bottom.scanButton.clicked.connect(self.start_scan)
+        self.bottom.saveButton.clicked.connect(self.save_scan)
+
         layout.addWidget(self.bottom)
 
         widget = QWidget()
         widget.setLayout(layout)
         self.setCentralWidget(widget)
+
 
     def update_sensor_display(self):
         roll, pitch, yaw = self.latest_angles
@@ -65,6 +74,12 @@ class MainWindow(QMainWindow):
         self.bottom.sensorPanel.update_force(
             force
         )
+
+        # Records data if user ticks the checkbox
+        if self.bottom.recordCheckBox.isChecked():
+            self.scan_data.append([x, y, z, 
+                                   roll, pitch, yaw, 
+                                   force]) 
 
     def update_connection_status(self, connected):
         if connected:
@@ -108,6 +123,27 @@ class MainWindow(QMainWindow):
         popup.show()
         self.current_popup = popup
 
+    def save_scan(self):
+        headers = ["X", "Y", "Z", "Roll", "Pitch", "Yaw", "Force"] 
+
+        if not self.scan_data:
+            dlg = QMessageBox(self)
+            dlg.setWindowTitle("Error")
+            dlg.setText("No Data To Export")
+            dlg.exec()
+            return  
+            
+        with open("output.csv", "w", newline="") as file:
+            writer = csv.writer(file)
+            writer.writerow(headers) # Write headers
+            writer.writerows(self.scan_data) # Write data
+
+            dlg = QMessageBox(self)
+            dlg.setWindowTitle("Saved")
+            dlg.setText("Data successfully exported")
+            dlg.exec()
+    
+
 class bottomWindow(QWidget):
     def __init__(self):
         super().__init__()
@@ -135,7 +171,6 @@ class bottomWindow(QWidget):
             }
         """)
         self.calibrateButton.setFixedSize(250, 100)
-        # self.calibrateButton.clicked.connect(self.calibrate) 
         layout.addWidget(self.calibrateButton)
 
         self.scanButton = QPushButton("Scan")
@@ -148,7 +183,6 @@ class bottomWindow(QWidget):
             }
         """)
         self.scanButton.setFixedSize(250, 100)
-        # self.scanButton.clicked.connect(self.scan) 
         layout.addWidget(self.scanButton)
 
         self.saveButton = QPushButton("Save")
@@ -161,20 +195,14 @@ class bottomWindow(QWidget):
             }
         """)
         self.saveButton.setFixedSize(250, 100)
-        # self.saveButton.clicked.connect(self.save)
         layout.addWidget(self.saveButton)
+
+        self.recordCheckBox = QCheckBox("Record Data", self)
+        self.recordCheckBox.setChecked(False) 
+        layout.addWidget(self.recordCheckBox)
 
         self.sensorPanel = SensorPanel()
         layout.addWidget(self.sensorPanel, stretch=2)
-
-        # def calibrate(self):
-        #     print("You clicked the calibrate button!")
-
-        # def scan(self):
-        #     print("You clicked the scan button!")
-            
-        # def save(self): # Exports results as a .csv
-        #     print("You clicked the save button!")
 
 
 class PyQtGraph3DWindow(QWidget):
@@ -197,35 +225,7 @@ class PyQtGraph3DWindow(QWidget):
         grid.setSpacing(1, 1, 1)
         self.view.addItem(grid)
 
-        # Add reference semi-circle
-        radius = 3
-        n_theta = 20      # Around z-axis
-        n_phi = 12        # From top to equator
-        theta = np.linspace(0, 2*np.pi, n_theta)
-        phi = np.linspace(0, np.pi/2, n_phi)   # Only upper half
-        theta, phi = np.meshgrid(theta, phi)
-
-        # Cartesian coordinates
-        x = radius * np.sin(phi) * np.cos(theta)
-        y = radius * np.sin(phi) * np.sin(theta)
-        z = radius * np.cos(phi)
-
-        # Convert grid to vertices
-        verts = np.vstack([x.ravel(), y.ravel(), z.ravel()]).T
-
-        # Build triangular faces
-        faces = []
-        for i in range(n_phi - 1):
-            for j in range(n_theta - 1):
-                a = i * n_theta + j
-                b = a + 1
-                c = a + n_theta
-                d = c + 1
-
-                faces.append([a, c, b])
-                faces.append([b, c, d])
-
-        faces = np.array(faces)
+        verts, faces = breast.get_mesh()
 
         mesh = gl.MeshData(vertexes=verts, faces=faces)
 
@@ -241,13 +241,11 @@ class PyQtGraph3DWindow(QWidget):
         self.view.addItem(item)
 
         self.sensor_point = gl.GLScatterPlotItem(
-            pos=np.array([[0, 0, radius]]),   # Initial position
+            pos=np.array([[config.IMU0_OFFSET, 0, config.BREAST_C + config.PCB_OFFSET]]),   # Initial position
             color=(0.5, 0, 0, 1),          # Red
             size=20
         )
         self.view.addItem(self.sensor_point)
-
-        self.radius = radius
 
     def update_orientation(self, roll, pitch):
         """
@@ -276,7 +274,14 @@ class PyQtGraph3DWindow(QWidget):
             pos=np.array([[x, y, z]])
         )
 
+    def update_position(self, p):
+        """
+        Update probe position using vector p
 
+        """
+        self.sensor_point.setData(
+            pos = np.array([p])
+        )
 
 class SensorPanel(QGroupBox):
     def __init__(self):
