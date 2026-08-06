@@ -1,8 +1,9 @@
 import sys
 import numpy as np
+import csv
 import pyqtgraph.opengl as gl
 from PyQt6.QtCore import QSize, Qt, QTimer
-from PyQt6.QtWidgets import QApplication, QGridLayout, QHBoxLayout, QMainWindow, QPushButton, QWidget, QVBoxLayout, QGroupBox, QFormLayout, QLabel, QMessageBox
+from PyQt6.QtWidgets import QApplication, QGridLayout, QHBoxLayout, QMainWindow, QPushButton, QWidget, QVBoxLayout, QGroupBox, QFormLayout, QLabel, QMessageBox, QCheckBox
 from PyQt6.QtGui import QFont
 
 font = QFont()
@@ -18,6 +19,7 @@ class MainWindow(QMainWindow):
         self.latest_angles = np.zeros(3)
         self.latest_force = 0.0
         self.current_popup = None
+        self.scan_data = [] # For recording data
 
         self.scanning = False
         self.reset_request = False
@@ -39,6 +41,7 @@ class MainWindow(QMainWindow):
 
         self.bottom = bottomWindow()
         self.bottom.scanButton.clicked.connect(self.start_scan)
+        self.bottom.saveButton.clicked.connect(self.save_scan)
         layout.addWidget(self.bottom)
 
         widget = QWidget()
@@ -65,6 +68,11 @@ class MainWindow(QMainWindow):
         self.bottom.sensorPanel.update_force(
             force
         )
+        # Records data if user ticks the checkbox
+        if self.bottom.recordCheckBox.isChecked():
+            self.scan_data.append([x, y, z, 
+                                   roll, pitch, yaw, 
+                                   force]) 
 
     def update_connection_status(self, connected):
         if connected:
@@ -107,6 +115,26 @@ class MainWindow(QMainWindow):
         popup.setIcon(QMessageBox.Icon.Information)
         popup.show()
         self.current_popup = popup
+
+    def save_scan(self):
+        headers = ["X", "Y", "Z", "Roll", "Pitch", "Yaw", "Force"] 
+
+        if not self.scan_data:
+            dlg = QMessageBox(self)
+            dlg.setWindowTitle("Error")
+            dlg.setText("No Data To Export")
+            dlg.exec()
+            return  
+            
+        with open("output.csv", "w", newline="") as file:
+            writer = csv.writer(file)
+            writer.writerow(headers) # Write headers
+            writer.writerows(self.scan_data) # Write data
+
+            dlg = QMessageBox(self)
+            dlg.setWindowTitle("Saved")
+            dlg.setText("Data successfully exported")
+            dlg.exec()        
 
 class bottomWindow(QWidget):
     def __init__(self):
@@ -167,14 +195,9 @@ class bottomWindow(QWidget):
         self.sensorPanel = SensorPanel()
         layout.addWidget(self.sensorPanel, stretch=2)
 
-        # def calibrate(self):
-        #     print("You clicked the calibrate button!")
-
-        # def scan(self):
-        #     print("You clicked the scan button!")
-            
-        # def save(self): # Exports results as a .csv
-        #     print("You clicked the save button!")
+        self.recordCheckBox = QCheckBox("Record Data", self)
+        self.recordCheckBox.setChecked(False) 
+        layout.addWidget(self.recordCheckBox)
 
 
 class PyQtGraph3DWindow(QWidget):
