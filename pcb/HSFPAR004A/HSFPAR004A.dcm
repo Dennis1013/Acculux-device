@@ -1,0 +1,9 @@
+EESchema-DOCLIB  Version 2.0
+#
+$CMP HSFPAR004A
+D Resistive Force Sensor 0.82kgf (1.8lbs)
+K
+F https://eu.mouser.com/datasheet/2/15/Alps_09242019_HSFPAR004A_datasheet-1651683.pdf
+$ENDCMP
+#
+#End Doc Library
