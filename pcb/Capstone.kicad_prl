@@ -17,17 +17,17 @@
     },
     "prototype_zone_fills": false,
     "selection_filter": {
-      "dimensions": false,
-      "footprints": false,
-      "graphics": false,
-      "keepouts": false,
+      "dimensions": true,
+      "footprints": true,
+      "graphics": true,
+      "keepouts": true,
       "lockedItems": false,
-      "otherItems": false,
-      "pads": false,
-      "text": false,
+      "otherItems": true,
+      "pads": true,
+      "text": true,
       "tracks": true,
       "vias": true,
-      "zones": false
+      "zones": true
     },
     "visible_items": [
       "vias",
@@ -51,8 +51,8 @@
       "conflict_shadows",
       "shapes"
     ],
-    "visible_layers": "ffffffff_ffffffff_ffffd575_fffd5f0c",
-    "zone_display_mode": 0
+    "visible_layers": "ffffffff_ffffffff_fffffff5_fffdffff",
+    "zone_display_mode": 1
   },
   "git": {
     "integration_disabled": false,
@@ -97,11 +97,11 @@
       222,
       207,
       136,
-      92,
+      105,
       136,
+      140,
       136,
-      136,
-      98,
+      109,
       136,
       136,
       136,
